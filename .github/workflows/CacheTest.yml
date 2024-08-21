@@ -1,0 +1,43 @@
+name: Some Check
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Runs at 00:00 UTC daily.
+  workflow_dispatch: # for manual testing
+
+permissions: write-all
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4 # otherwise can't use `gh` command
+
+      # Fetch the data
+      - name: Fetch data
+        run: curl "https://some-url.com" -o some-data.html
+
+      # Ensure the file exists and has content before proceeding
+      - name: Check file existence
+        run: |
+          if [ ! -s some-data.html ]; then
+            echo "Error: File does not exist or is empty."
+            exit 1
+          fi
+
+      # Attempt to fetch cache
+      - name: Fetch Cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: some-data.html
+          key: ${{ hashFiles('some-data.html') }}
+
+      # Conditional logic for issue creation
+      - name: Open an Issue if data changed
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          echo "The some data has changed. Please review." > issue-body.txt
+          gh issue create --title "some data has changed" --body-file issue-body.txt
+        env:
+          GH_TOKEN: ${{ github.token }}
